@@ -63,15 +63,17 @@ We can pattern match on value constructors. Implement:
 
 \begin{code}
 not' :: YesOrNo -> YesOrNo
-not' = undefined
+not' Yes = No 
+not' No = Yes
 
 
 (|||) :: YesOrNo -> YesOrNo -> YesOrNo
-(|||) = undefined
+No ||| No = No 
+_ ||| _ = Yes
 
 
 or' :: [YesOrNo] -> YesOrNo
-or' = undefined
+or' = foldr (|||) No
 \end{code}
 
 ---
@@ -96,10 +98,10 @@ Use pattern matching to write some Box functions:
 
 \begin{code}
 boxStr :: Box -> String
-boxStr = undefined
+boxStr (Box n b s) = "The box's string is: " ++ s
 
 boxCombine :: Box -> Box -> Box
-boxCombine = undefined
+boxCombine (Box n1 b1 s1) (Box n2 b2 s2) = Box (n1 + n2) (b1 && b2) (s1 ++ s2)
 \end{code}
 
 ---
@@ -119,7 +121,9 @@ and extract their fields. Try implementing:
 
 \begin{code}
 area :: Shape -> Double
-area = undefined
+area (Circle r) = pi * r * r 
+area (Triangle h b) = h * b / 2 
+area (Rectangle l w) = l * w
 \end{code}
 
 ---
@@ -131,8 +135,8 @@ be formed from the "sum" and "product" of other types.
 Here are two sum types:
 
 \begin{code}
-data T1 = T1V1 | T1V2 | T1V3
-data T2 = T2V1 Bool | T2V2 T1
+data T1 = T1V1 | T1V2 | T1V3 -- 3 possible values
+data T2 = T2V1 Bool | T2V2 T1 -- 2+3 = 5 possible values
 \end{code}
 
 How many values belong to type `T2`?
@@ -141,7 +145,7 @@ How many values belong to type `T2`?
 Here's a product type:
 
 \begin{code}
-data T3 = T3V Bool T1
+data T3 = T3V Bool T1 -- 2*3 = 6 possible values
 \end{code}
 
 
@@ -151,7 +155,7 @@ How many values belong to type `T3`?
 Here's a type that is both a sum and product type:
 
 \begin{code}
-data T4 = T4V1 T1 T2 | T4V2 T2 T3
+data T4 = T4V1 T1 T2 | T4V2 T2 T3 -- (3*5) + (5*6) = 45 possible values
 \end{code}
 
 How many values belong to type `T4`?
@@ -218,7 +222,9 @@ Write a function to return the message in the innermost non-empty doll:
 
 \begin{code}
 innerMostMessage :: RussianDoll -> String
-innerMostMessage = undefined
+innerMostMessage EmptyDoll = error "No empty dolls!" 
+innerMostMessage (RussianDoll m EmptyDoll) = m 
+innerMostMessage (RussianDoll m d) = innerMostMessage d
 \end{code}
 
 
@@ -226,7 +232,9 @@ Write a function to reverse the order of messages in a doll:
 
 \begin{code}
 reverseMessages :: RussianDoll -> RussianDoll
-reverseMessages = undefined
+reverseMessages d = rev d EmptyDoll 
+  where rev EmptyDoll acc = acc
+        rev (RussianDoll m d) acc = rev d (RussianDoll m acc)
 \end{code}
 
 
@@ -263,11 +271,13 @@ E.g., define some some functions on `UniversalBox` values:
 
 \begin{code}
 catBoxes :: UniversalBox [a] -> UniversalBox [a] -> UniversalBox [a]
-catBoxes = undefined
+catBoxes (UBox l1) (UBox l2) = UBox $ l1 ++ l2
 
 
 sumBoxes :: Num a => [UniversalBox a] -> UniversalBox a
-sumBoxes = undefined
+sumBoxes [] = UBox 0 
+sumBoxes ((UBox m) : bs) = let UBox r = sumBoxes bs 
+                            in UBox $ m + r
 \end{code}
 
 

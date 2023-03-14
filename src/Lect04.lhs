@@ -4,7 +4,7 @@
 
 > module Lect04 where
 > import Data.Char
-
+  
 Lists
 =====
 
@@ -91,21 +91,24 @@ Functions that construct lists typically:
 E.g., implement the following list construction functions:
 
 > replicate' :: Int -> a -> [a]
-> replicate' = undefined
+> replicate' 0 _ = []
+> replicate' n x = x : replicate' (n-1) x
 >
 > enumFromTo' :: (Ord a, Enum a) => a -> a -> [a]
-> enumFromTo' = undefined
+> enumFromTo' x y | x > y = []
+>                 | x == y = x:[]
+>                 | otherwise =  x : enumFromTo' (succ x) y
 >
 > -- and now for some infinite lists
 >
 > ones :: [Int]
-> ones = undefined
+> ones = 1 : ones
 > 
 > repeat' :: a -> [a]
-> repeat' = undefined
+> repeat' x = x : repeat' x
 >
 > enumFrom' :: Enum a => a -> [a]
-> enumFrom' = undefined
+> enumFrom' x = x : enumFrom' (succ x)
 
 
 Note: use `take` to limit the number of values drawn from an infinite list
@@ -140,13 +143,13 @@ E.g.,
 E.g., try implementing:
 
 > factors :: Integral a => a -> [a]
-> factors = undefined
+> factors n = [f | f <- [2..n-1], n `mod` f == 0]
 >
 > cartesianProduct :: [a] -> [b] -> [(a,b)]
-> cartesianProduct = undefined
+> cartesianProduct xs ys = [(x,y) | x <- xs, y <- ys] 
 >
 > concat' :: [[a]] -> [a]
-> concat' = undefined
+> concat' ls = [x | l <- ls, x <- l]
 
 
 Common list functions
@@ -209,14 +212,14 @@ value constructors can be used for pattern matching).
 E.g., implement:
 
 > head' :: [a] -> a
-> head' = undefined
+> head' (x : _) = x
 >
 > tail' :: [a] -> [a]
-> tail' = undefined
+> tail' (_ : xs) = xs
 > 
 > null' :: [a] -> Bool
-> null' = undefined
-
+> null' [] = True
+> null' (_ : _) = False
 
 -- Structural recursion
 
@@ -244,11 +247,13 @@ E.g., to compute the length of a list:
 E.g., implement more built-in functions:
 
 > last' :: [a] -> a
-> last' = undefined
+> last' [x] = x 
+> last' (_ : xs) = last' xs
 >
 >
 > (+++) :: [a] -> [a] -> [a]
-> (+++) = undefined
+> [] +++ ys = ys 
+> (x : xs) +++ ys = x : xs +++ ys
 >
 >
 > (!!!) :: [a] -> Int -> a -- the ! in its name is an implicit warning as to its inefficiency!
@@ -256,23 +261,34 @@ E.g., implement more built-in functions:
 >
 >
 > reverse' :: [a] -> [a]
-> reverse' = undefined
+> reverse' [] = []
+> reverse' (x:xs) = reverse' xs +++ [x] -- this sucks because it has O(n^2) time complexity.  
 >
 >
 > take' :: Int -> [a] -> [a]
-> take' = undefined
+> take' 0 _ = []
+> take' _ [] = []
+> take' n (x:xs) = x : take' (n-1) xs
 >
 >
 > splitAt' :: Int -> [a] -> ([a], [a])
-> splitAt' = undefined
+> splitAt' _ [] = ([],[])
+> splitAt' 0 l = ([],l)
+> splitAt' n (x:xs) = let (ys, zs) = splitAt' (n-1) xs
+>                     in (x : ys, zs)
 >
 >
 > break' :: (a -> Bool) -> [a] -> ([a], [a])
-> break' = undefined
->
+> break' _ [] = ([],[])
+> break' f l@(x:xs) | f x = ([], l)
+>                   | otherwise = let (ys, zs) = break' f xs
+>                                 in (x:ys, zs)
 >
 > words' :: String -> [String]
-> words' = undefined
+> words' "" = []
+> words' l@(c:cs) | isSpace c = words' cs
+>                 | otherwise = let (w, ws) = break' isSpace l
+>                               in w : words' ws
 
 
 E.g., the Caesar cipher is an encryption scheme that takes a plain text input
@@ -291,4 +307,9 @@ determine if a character is a letter. We'll convert all letters to uppercase
 for simplicity with `toUpper`.
 
 > caesar :: Int -> String -> String
-> caesar = undefined
+> caesar 0 s = s
+> caesar _ [] = [] 
+> caesar n s@(c:cs) = (if isLetter c then encrypt c else c) : caesar n cs
+>   where encrypt c = n2c ((c2n c + n) `mod` 26) 
+>         c2n c = ord (toUpper c) - ord 'A'
+>         n2c n = chr (n + ord 'A') 

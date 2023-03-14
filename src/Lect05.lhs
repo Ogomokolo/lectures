@@ -106,7 +106,7 @@ E.g., let's write a specification for `c2k`, `c2f`, `f2c`:
 
 \begin{code}
 c2k :: (Ord a, Floating a) => a -> a
-c2k c | c >= 0 = c + 273.15
+c2k c | c >= -273.15 = c + 273.15
       | otherwise = error "Temperature below absolute zero"
 
 
@@ -123,15 +123,24 @@ celsiusConversionSpec =
   describe "Celsius conversions" $ do
     describe "c2k" $ do
       it "works for known examples" $ do
-        pending
+        c2k 0 `shouldBe` 273.15
+        c2k 100 `shouldBe` 373.15
+        c2k (-100) `shouldSatisfy` (=~= 173.15)
       it "fails for sub-abs-zero temperatures" $ do
         pending
     describe "c2f" $ do
       it "works for known examples" $ do
-        pending
+        c2f 0 `shouldBe` 32
+        c2f 100 `shouldBe` 212
+        c2f (-40) `shouldBe` -40
     describe "f2c" $ do
       it "works for known examples" $ do
-        pending
+        f2c 32 `shouldBe` 0
+        f2c 212 `shouldBe` 100
+        f2c 1001.1 `shouldSatisfy` (=~= 538.389)
+infix 4 =~=
+(=~=) :: (Floating a, Ord a) => a -> a -> Bool
+x =~= y = abs (x - y) < 0.001
 \end{code}
 
 
@@ -150,9 +159,14 @@ quadRootsSpec :: Spec
 quadRootsSpec = 
   describe "quadRoots" $ do
     it "works for known examples" $ do
-      pending
+      quadRoots 1 (-3) 2 `shouldMatchTuple` (1.0, 2.0)
+      quadRoots 1 0 (-1) `shouldMatchTuple` (1.0, -1.0)
+      quadRoots 1 (-7) 12 `shouldMatchTuple` (3, 4)
+      quadRoots 1 (-1) (-6) `shouldMatchTuple` (-2, 3)
     it "fails when non-real roots exist" $ do
       pending
+shouldMatchTuple :: (Eq a, Show a) => (a, a) -> (a, a) -> Expectation
+shouldMatchTuple (x1, x2) (y1, y2) = [x1, x2] `shouldMatchList` [y1, y2]
 \end{code}
 
 
@@ -182,7 +196,13 @@ E.g., write a property to test that `c2f` and `f2c` are inverses:
 
 \begin{code}
 prop_c2f2c :: Double -> Bool
-prop_c2f2c = undefined
+prop_c2f2c c = f2c (c2f c) =~= c
+cTemp :: Gen Double
+cTemp = choose (-273.15, 1000)
+prop_c2f2c' :: Property
+prop_c2f2c' = forAll cTemp prop_c2f2c
+prop_c2f2c'' :: Double -> Property
+prop_c2f2c'' c = c >= 0 ==> f2c (c2f c) =~= c
 \end{code}
 
 
@@ -195,7 +215,7 @@ mySum (x:xs) = x + mySum xs
 
 
 prop_sum :: [Integer] -> Bool
-prop_sum = undefined
+prop_sum l = mySum l == sum l
 \end{code}
 
 
@@ -204,11 +224,9 @@ addition and commutativity of addition:
 
 \begin{code}
 prop_distMultOverAdd :: Integer -> [Integer] -> Bool
-prop_distMultOverAdd = undefined
-
-
+prop_distMultOverAdd m ns = m * mySum ns == mySum [ m*i | i <- ns ]
 prop_commAdd :: [Integer] -> Property
-prop_commAdd = undefined
+prop_commAdd xs = forAll (shuffle xs) (\ys -> mySum xs == mySum ys)
 \end{code}
 
 
@@ -217,9 +235,11 @@ squares and factorable quadratic equations:
 
 \begin{code}
 prop_perfSquare :: Double -> Bool
-prop_perfSquare = undefined
-
-
+prop_perfSquare r = let (r1, r2) = quadRoots a b c
+                    in r =~= r1 && r1 =~= r2
+      where a = 1
+            b = (-2) * r
+            c = r*r
 prop_solvesFactored :: Double -> Double -> Bool
 prop_solvesFactored = undefined
 \end{code}
@@ -232,11 +252,14 @@ quadRootsSpec' :: Spec
 quadRootsSpec' = 
   describe "quadRoots" $ do
     it "works for known examples" $ do
-      pending
+      quadRoots 1 (-3) 2 `shouldMatchTuple` (1.0, 2.0)
+      quadRoots 1 0 (-1) `shouldMatchTuple` (1.0, -1.0)
+      quadRoots 1 (-7) 12 `shouldMatchTuple` (3, 4)
+      quadRoots 1 (-1) (-6) `shouldMatchTuple` (-2, 3)
     it "fails when non-real roots exist" $ do
       pending
     it "works correctly with perfect squares" $ 
-      pending
+      property prop_perfSquare
     it "works correctly with factorable quadratic equations" $ 
       pending
 \end{code}

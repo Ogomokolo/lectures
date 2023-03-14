@@ -41,7 +41,7 @@ Basic combinators
 \begin{code}
 ($) :: (a -> b) -> a -> b
 infixr 0 $
-($) = undefined
+f $ x = f x
 \end{code}
 
 It seems redundant (why?), but is quite useful in practice!
@@ -62,16 +62,15 @@ E.g., how can we rewrite the following expresions?
 \begin{code}
 (.) :: (b -> c) -> (a -> b) -> a -> c
 infixr 9 .
-(.) = undefined
+f . g = \x -> f $ g x
 \end{code}    
 
 E.g., re-implement `even'`, `k2h`, and `strip` with composition:
 
 \begin{code}
 even' :: Integral a => a -> Bool
-even' x = 0 == (x `rem` 2)
-
-
+-- even' x = 0 == (x `rem` 2)
+even' = (== 0) . (`rem` 2)  -- e.g., a "point-free" function definition
 k2c :: Num a => a -> a
 k2c k = k - 273
 
@@ -85,11 +84,15 @@ f2h f
   | otherwise = "survivable"
 
 k2h :: (Ord a, Fractional a) => a -> String
-k2h  k = f2h $ c2f $ k2c k
-
+-- k2h  k = f2h $ c2f $ k2c k
+k2h = f2h . c2f . k2c
 
 strip :: String -> String
-strip s = reverse $ dropWhile isSpace $ reverse $ dropWhile isSpace s
+-- strip s = reverse $ dropWhile isSpace $ reverse $ dropWhile isSpace s
+-- This gets rid of the spaces at the beginning and the end of a list
+-- strip = reverse . dropWhile isSpace . reverse . dropWhile isSpace
+--          OR
+strip = let f = reverse . dropWhile isSpace in f . f
 \end{code}
 
 
@@ -99,11 +102,14 @@ Combinators are especially useful when paired with other HOFs!
 
 \begin{code}
 flip :: (a -> b -> c) -> b -> a -> c
-flip = undefined
-
+-- flip f = \x y -> f y x 
+--          OR
+flip f x y = f y x
 
 on :: (b -> b -> c) -> (a -> b) -> a -> a -> c
-on = undefined
+-- on f g = \x y -> f (g x) (g y)
+--          OR
+on f g x y = f (g x) (g y)
 \end{code}
 
 
@@ -114,7 +120,8 @@ Recursive patterns via HOFs
 
 \begin{code}
 map :: (a -> b) -> [a] -> [b]
-map = undefined
+map _ [] = []
+map f (x:xs) = f x : map f xs
 \end{code}
 
 
@@ -144,7 +151,9 @@ E.g.,
 
 \begin{code}
 filter :: (a -> Bool) -> [a] -> [a]
-filter = undefined
+filter _  [] = []
+filter p (x:xs) | p x = x : filter p xs 
+                | otherwise = filter p xs
 \end{code}                 
 
 
@@ -171,10 +180,12 @@ E.g.,
 
 \begin{code}
 all :: (a -> Bool) -> [a] -> Bool
-all = undefined
+all _ [] = True
+all p (x:xs) = p x && all p xs
 
 any :: (a -> Bool) -> [a] -> Bool
-any = undefined
+any _ [] = False
+any p (x:xs) = p x || any p xs
 \end{code}
 
 E.g.,
@@ -199,7 +210,10 @@ sort (x:xs) = sort [y | y <- xs, y < x]
 
 
 sortBy :: (a -> a -> Ordering) -> [a] -> [a]
-sortBy = undefined
+sortBy _ [] = []
+sortBy cmp (x:xs) = sortBy cmp [y | y <- xs, cmp x y == LT] 
+                    ++ [x] 
+                    ++ sortBy cmp [y | y <- xs, cmp x y /= LT]
 \end{code}
 
 E.g.,
@@ -230,12 +244,25 @@ showCat (x:xs) = ((++) . show) x $ showCat xs
 
 What is the essential pattern here?
 
+- the input tyoe is a list, [a]
 
+- the return type is something else, b 
+
+- i.e., we have [a] -> b
+
+- the base case returns some fixed value of type b
+
+- the recursive case applies a "combiner function" to the first element of
+  the list (of type a), and then to the return value of th erecursive call (b) 
+
+  - i.e., the combiner function has type: a -> b -> b 
 
 Write the HOF that captures this pattern:
 
 \begin{code}
-foldr = undefined
+foldr :: (a -> b -> b) -> b -> [a] -> b
+foldr _ val [] = val
+foldr f val (x:xs) = f x $ foldr f val xs
 \end{code}
 
 
@@ -243,34 +270,50 @@ E.g., trace the evaluation of `foldr (+) 0 [1..5]`:
 
   foldr (+) 0 (1 : (2 : (3 : (4 : (5 : [])))))
 
-= ?
+= 1 + (foldr (+) 0 (2 : (3 : (4 : (5 : [])))))
 
+= 1 + (2 + (foldr (+) 0 (3 : (4 : (5 : [])))))
+
+= 1 + (2 + (3 + (foldr (+) 0 (4 : (5 : [])))))
+
+= 1 + (2 + (3 + (4 + (foldr (+) 0 (5 : [])))))
+
+= 1 + (2 + (3 + (4 + (5 + (foldr (+) 0 [])))))
+
+= 1 + (2 + (3 + (4 + (5 + 0))))
+
+= 1 + (2 + (3 + (4 + 5)))
+
+= 1 + (2 + (3 + 9))
+
+= 1 + (2 + 12)
+
+= 1 + 14
+
+= 15
 
 Let's define some recursive functions in terms of foldr:
 
 \begin{code}
 and' :: [Bool] -> Bool
-and' = undefined
-
+and' = foldr (&&) True
 
 showCat' :: Show a => [a] -> String
-showCat' = undefined
-
+showCat' = foldr ((++) . show) ""
 
 (+++) :: [a] -> [a] -> [a]
-l1 +++ l2 = undefined
-
+l1 +++ l2 = foldr (:) l2 l1
 
 length' :: [a] -> Int
-length' = undefined
-
+length' = foldr (\_ l -> l + 1) 0
 
 map' :: (a -> b) -> [a] -> [b]
-map' f = undefined
-
+map' f = foldr ((:) . f) []
 
 filter' :: (a -> Bool) -> [a] -> [a]
-filter' p = undefined
+filter' p = foldr f []
+  where f x r | p x = x : r 
+              | otherwise = r
 \end{code}
 
 
@@ -329,12 +372,19 @@ playMoves board (m:moves) = playMoves (move board m) moves
 
 How is the pattern different from before?
 
+- the recursive call is in the tail position
 
+- the base case returns the accumulated value
+
+- the combiner function takes the accumulator and an element and returns
+  a new result (this result is passed into the recursive call)
 
 Write the HOF that captures this pattern:
 
 \begin{code}
-foldl = undefined
+foldl :: (b -> a -> b) -> b -> [a] -> b
+foldl _ acc [] = acc 
+foldl f acc (x:xs) = foldl f (f acc x) xs
 \end{code}
 
 
@@ -342,18 +392,39 @@ E.g., trace the evaluation of `foldl (+) 0 [1..5]`:
 
   foldl (+) 0 (1 : (2 : (3 : (4 : (5 : [])))))
 
-= ?
+= foldl (+) (0 + 1) (2 : (3 : (4 : (5 : []))))
+
+= foldl (+) ((0 + 1) + 2) (3 : (4 : (5 : [])))
+
+= foldl (+) (((0 + 1) + 2) + 3) (4 : (5 : []))
+
+= foldl (+) ((((0 + 1) + 2) + 3) + 4) (5 : [])
+
+= foldl (+) (((((0 + 1) + 2) + 3) + 4) + 5) []
+
+= (((((0 + 1) + 2) + 3) + 4) + 5) -- <-- a "thunk" (a big unevaluated function)
+
+= ((((1 + 2) + 3) + 4) + 5)
+
+= (((3 + 3) + 4) + 5)
+
+= ((6 + 4) + 5)
+
+= (10 + 15)
+
+= 15
 
 
 Let's define some recursive functions in terms of foldl:
 
 \begin{code}
 hash' :: String -> Integer
-hash' = undefined
-
+hash' = foldl h 107
+  where h acc c = (7*acc `xor` fromIntegral (ord c)) `mod` 1000007
 
 playMoves' :: [(Int,Char)] -> [Char]
-playMoves' = undefined
+playMoves' = foldl move "-------------" 
+  where move board (x,y) = take x board ++ [y] ++ drop (x+1) board
 \end{code}
 
 
@@ -402,7 +473,11 @@ Write a stricter (traced) version of the left fold:
 
 \begin{code}
 foldlTS :: (Show a, Show b) => (b -> a -> b) -> b -> [a] -> b
-foldlTS = undefined
+foldlTS _ v [] = v
+foldlTS f v (x:xs) = let e  = trace ("<" ++ show x ++ ">") x
+                         a  = f v e
+                         a' = trace ("<<" ++ show a ++ ">>") a
+                     in trace "R" $ a' `seq` foldlTS f a' xs
 \end{code}
 
 E.g., try `foldlTS (+) 0 [1..10]` and `foldlTS (flip (:)) [] [1..10]`
@@ -413,6 +488,26 @@ How is this more efficient than the previous version? When is it arguably better
 -------------------------------------------------------------------------------
 
 When to fold left or right?
+
+-- Usually, the right fold is better. 
+  - When the list is infinite
+
+  - When the combining function can short-circuit (i.e., it isn't
+    strict in both arguments)
+
+  - When the combining function is right associative
+
+  - When we can't tolerate a reversal of elements when constructing the result
+  
+- Left (Strict), when:
+
+  - The function is left associative (and the list isn't infinite)
+
+  - The function is commutative (or left-associative), and the entire
+    list needs to be processed to get the result --- this takes advantage of
+    the accumulator pattern
+
+- Very, very, very rarely is the non-strict left fold the right one
 
 
 Bonus HOFs
@@ -425,15 +520,14 @@ E.g.,
 
 \begin{code}
 foldr1 :: (a -> a -> a) -> [a] -> a
-foldr1 = undefined
-
+foldr1 f [x] = x
+foldr1 f (x:xs) = f x $ foldr1 f xs
 -- e.g., foldr1 (*) [1..5]
 --       foldr1 (^) [2,2,3]
 
 
 foldl1 :: (a -> a -> a) -> [a] -> a
-foldl1 = undefined
-
+foldl1 f (x:xs) = foldl f x xs
 -- e.g., foldl1 (++) [[1,2], [3,4], [5,6]]
 --       foldl1 (/) [16,2,4]
 \end{code}
@@ -460,8 +554,7 @@ of repeated applications of the function to the initial value.
 
 \begin{code}
 iterate :: (a -> a) -> a -> [a]
-iterate = undefined
-
+iterate f x = x : iterate f (f x)
 -- e.g., take 10 $ iterate (*2) 1
 \end{code}
 
@@ -471,8 +564,8 @@ satisfies the predicate when repeatedly applied to the function.
 
 \begin{code}
 until :: (a -> Bool) -> (a -> a) -> a -> a
-until = undefined
-
+until p f x | p x = x 
+            | otherwise = until p f (f x)
 -- e.g., until (> 100) (*2) 1
 -- e.g., let n = 2 in until (\x -> abs (n-x*x) < 0.001) (\x -> (x + n/x) / 2) 1
 \end{code}

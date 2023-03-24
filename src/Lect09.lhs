@@ -44,7 +44,8 @@ We can make a list a Functor, where `fmap` is identical to `map`
 \begin{code}
 instance Functor [] where
   fmap :: (a -> b) -> [a] -> [b]
-  fmap = undefined
+  fmap _ [] = []
+  fmap f (x:xs) = f x : fmap f xs
 \end{code}
 
 Note that the implied type of `fmap` in the instance (replacing `f` from the
@@ -67,7 +68,8 @@ Let's define `fmap` for the Maybe type:
 \begin{code}
 instance Functor Maybe where
   fmap :: (a -> b) -> Maybe a -> Maybe b
-  fmap = undefined
+  fmap _ Nothing = Nothing 
+  fmap f (Just x) = Just $ f x
 \end{code}
 
 we can now do:
@@ -114,7 +116,8 @@ data Tree a = Node a [Tree a] | Leaf a
 
 instance Functor Tree where
   fmap :: (a -> b) -> Tree a -> Tree b
-  fmap = undefined
+  fmap f (Leaf x) = Leaf $ f x 
+  fmap f (Node x ts) = Node (f x) $ (f <$>) <$> ts
 \end{code}
 
 
@@ -163,7 +166,7 @@ can write a Functor instance for the type `((->) a)` (note that `a` is the first
 \begin{code}
 instance Functor ((->) a) where
   fmap :: (b -> c) -> (a -> b) -> (a -> c)
-  fmap = undefined
+  fmap = (.)
 \end{code}
 
 How should we interpret the following?
@@ -199,10 +202,12 @@ Let's make `Maybe` an Applicative instance:
 \begin{code}
 instance Applicative Maybe where
   pure :: a -> Maybe a
-  pure = undefined
+  pure x = Just x
   
   (<*>) :: Maybe (a -> b) -> Maybe a -> Maybe b
-  (<*>) = undefined
+  Nothing <*> _ = Nothing 
+  _ <*> Nothing = Nothing 
+  (Just f) <*> (Just x) = Just $ f x
 \end{code}
 
 
@@ -236,10 +241,12 @@ represent?
 \begin{code}
 instance Applicative [] where
   pure :: a -> [a]
-  pure = undefined
+  pure = repeat
   
-  (<*>) :: [a -> b] -> [a] -> [b]
-  (<*>) = undefined
+  (<*>) :: [a -> b] -> [a] -> [b] 
+  [] <*> _ = [] 
+  _ <*> [] = []
+  (f:fs) <*> (x:xs) = f x : (fs <*> xs) 
 \end{code}
 
 Try:

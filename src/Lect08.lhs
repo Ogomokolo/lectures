@@ -493,7 +493,10 @@ to the instance declaration. E.g., complete our `List` instance of `Eq`:
 \begin{code}
 instance (Eq a) => Eq (List a) where
   (==) :: Eq a => List a -> List a -> Bool
-  (==) = undefined
+  Null == Null = True
+  Null == _ = False
+  _ == Null = False
+  (x :- xs) == (y :- ys) = x == y && xs == ys
 \end{code}
 
 ---
@@ -502,7 +505,6 @@ Another useful class is `Foldable`, which only require `foldr` to be defined:
 
 \begin{verbatim}
 class Foldable t where
-  foldr   :: (a -> b -> b) -> b -> t a -> b
   foldr   :: (a -> b -> b) -> b -> t a -> b
   foldl   :: (b -> a -> b) -> b -> t a -> b
   foldr1  :: (a -> a -> a) -> t a -> a
@@ -522,7 +524,8 @@ Make `List` an instance of `Foldable`:
 \begin{code}
 instance Foldable List where
   foldr :: (a -> b -> b) -> b -> List a -> b
-  foldr = undefined
+  foldr _ v Null = v 
+  foldr f v (x :- xs) = f x $ foldr f v xs
 \end{code}
 
 

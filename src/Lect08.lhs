@@ -298,17 +298,17 @@ a value (or error).
 E.g., rewrite the following functions using `Maybe`:
 
 \begin{code}
-quadRoots :: Double -> Double -> Double -> (Double,Double)
+quadRoots :: Double -> Double -> Double -> Maybe (Double,Double)
 quadRoots a b c = let d = b^2-4*a*c
                       sd = sqrt d
                   in if d < 0
-                     then error "No real roots"
-                     else ((-b+sd)/(2*a), (-b-sd)/(2*a))
+                     then Nothing
+                     else Just ((-b+sd)/(2*a), (-b-sd)/(2*a))
 
 
-find :: (a -> Bool) -> [a] -> a
-find _ [] = error "Value not found"
-find p (x:xs) | p x = x
+find :: (a -> Bool) -> [a] -> Maybe a
+find _ [] = Nothing
+find p (x:xs) | p x = Just x
               | otherwise = find p xs
 \end{code}
 
@@ -327,10 +327,10 @@ contains error values, and the `Right` constructor contains correct values.
 E.g., rewrite the following using `Either`:
 
 \begin{code}
-find' :: (a -> Bool) -> [a] -> a
-find' _ [] = error "List was empty"
-find' p (x:xs) | p x = x
-               | null xs = error "No element satisifying predicate"
+find' :: (a -> Bool) -> [a] -> Either String a
+find' _ [] = Left "List was empty"
+find' p (x:xs) | p x = Right x
+               | null xs = Left "No element satisifying predicate"
                | otherwise = find' p xs
 \end{code}
 
@@ -375,15 +375,18 @@ Let's define some list functions!
 
 \begin{code}
 enumFromToL :: (Eq a, Enum a) => a -> a -> List a
-enumFromToL = undefined
+enumFromToL x y | x == y = x :- Null
+                | otherwise = x :- enumFromToL (succ x) y
 
 
 enumFromL :: (Eq a, Enum a) => a -> List a
-enumFromL = undefined
+enumFromL x = x :- enumFromL (succ x)
 
 
 takeL :: Int -> List a -> List a
-takeL = undefined
+takeL 0 _ = Null
+takeL _ Null = Null 
+takeL n (x :- xs) = x :- takeL (n-1) xs
 \end{code}
 
 
@@ -409,11 +412,11 @@ Define the following instances of `Explosive`.
 \begin{code}
 instance Explosive Integer where
   explode :: Integer -> [Integer]
-  explode = undefined
+  explode n = replicate 5 n
 
 instance Explosive [a] where
   explode :: [a] -> [[a]]
-  explode = undefined
+  explode l = [[x] | x <- l]
 \end{code}
 
 

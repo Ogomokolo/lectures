@@ -270,14 +270,14 @@ Now we can make `NDList` an instance of Functor and Applicative:
 \begin{code}
 instance Functor NDList where
   fmap :: (a -> b) -> NDList a -> NDList b
-  fmap = undefined
+  fmap f (NDList l) = NDList $ f <$> l
 
 instance Applicative NDList where
   pure :: a -> NDList a
-  pure = undefined
+  pure x = NDList [x]
   
   (<*>) :: NDList (a -> b) -> NDList a -> NDList b
-  (<*>) = undefined
+  NDList fs <*> NDList xs = NDList $ [f x | f <- fs, x <- xs]
 \end{code}
 
 
@@ -301,10 +301,11 @@ We can also make a function an Applicative:
 \begin{code}
 instance Applicative ((->) a) where
   pure :: b -> (a -> b)
-  pure = undefined
+  -- pure x = \_ -> x
+  pure = const
 
   (<*>) :: (a -> (b -> c)) -> (a -> b) -> (a -> c)
-  (<*>) = undefined
+  f <*> x = \y -> f y (x y)
 \end{code}
 
 What does this do?
@@ -380,7 +381,8 @@ Let's make `Maybe` a Monad instance:
 \begin{code}
 instance Monad Maybe where
   (>>=) :: Maybe a -> (a -> Maybe b) -> Maybe b
-  (>>=) = undefined
+  Nothing >>= _ = Nothing 
+  Just x >>= f = f x
 \end{code}
 
 Now we get sensible results by doing:
@@ -417,14 +419,26 @@ Without bind, we might write:
 
 \begin{code}
 fDivs :: Integral a => a -> a -> a -> a -> a -> a -> Maybe a
-fDivs a b c d e f = undefined
+fDivs a b c d e f = 
+  case a `safeDiv` b of 
+    Nothing -> Nothing
+    Just r -> 
+      case c `safeDiv` d of 
+        Nothing -> Nothing 
+        Just r' -> 
+          case (r + r') `safeDiv` e of 
+            Nothing -> Nothing 
+            Just r'' -> Just $ r'' * f
 \end{code}
 
 Or we can use our bind operator:
 
 \begin{code}
 fDivs' :: Integral a => a -> a -> a -> a -> a -> a -> Maybe a
-fDivs' a b c d e f = undefined
+fDivs' a b c d e f = a `safeDiv` b >>= \r -> 
+                     c `safeDiv` d >>= \r' -> 
+                     (r + r') `safeDiv` e >>= \r'' -> 
+                     return $ r'' * f
 \end{code}
 
 Explain how this works!
@@ -436,9 +450,9 @@ syntax for doing this -- "do notation":
 
 \begin{code}
 fDivs'' :: Integral a => a -> a -> a -> a -> a -> a -> Maybe a
-fDivs'' a b c d e f = do r   <- a `safeDiv` b
-                         r'  <- c `safeDiv` d
-                         r'' <- (r + r') `safeDiv` e
+fDivs'' a b c d e f = do r   <- a `safeDiv` b -- a `safeDiv` b >>= \r ->
+                         r'  <- c `safeDiv` d -- c `safeDiv` d >>= \r' ->
+                         r'' <- (r + r') `safeDiv` e -- (r + r') `safeDiv` e >>= \r'' ->
                          return $ r'' * f
 \end{code}
 
@@ -451,7 +465,14 @@ translate the following `do` block to lambda notation using `>>=` and `>>`:
        func3 r1 r2
        r3 <- func4 z
        func5 r3
-       return (r1, r2, r3)
+       return (r1, r2, r3) 
+
+    func1 x     >>= \r1 -> 
+    func2 y     >>= \r2 ->
+    func3 r1 r2 >>  \_ -> 
+    func4 z     >>= \r3 -> 
+    func5 r3    >>  \_ -> 
+    return (r1, r2, r3)
 
 `do` blocks also support `let` definitions, but `in` is omitted, e.g.:
 

@@ -45,7 +45,7 @@ Implement the Functor instance of Logger:
 \begin{code}
 instance Functor Logger where
   fmap :: (a -> b) -> Logger a -> Logger b
-  fmap = undefined
+  fmap f (Logger x m) = Logger (f x) m 
 \end{code}
 
 
@@ -54,10 +54,10 @@ Implement the Applicative instance of Logger:
 \begin{code}
 instance Applicative Logger where
   pure :: a -> Logger a
-  pure = undefined
+  pure x = Logger x []
   
   (<*>) :: Logger (a -> b) -> Logger a -> Logger b
-  (<*>) = undefined
+  Logger f m1 <*> Logger x m2 = Logger (f x) (m1 ++ m2)
 \end{code}
 
 
@@ -66,7 +66,8 @@ Implement the Monad instance of Logger:
 \begin{code}
 instance Monad Logger where
   (>>=) :: Logger a -> (a -> Logger b) -> Logger b
-  (>>=) = undefined
+  Logger x m >>= f = let Logger y m' = f x 
+                     in Logger y (m ++ m')
 \end{code}
 
 
@@ -141,13 +142,13 @@ operation semantics:
 
 \begin{code}
 pop :: State [a] a
-pop = undefined
+pop = State $ \(x:xs) -> (xs, x)
 
 push :: a -> State [a] ()
-push x = undefined
+push x = State (\xs -> (x:xs, ()))
 
 peek :: State [a] a
-peek = undefined
+peek = State $ \l@(x:_) -> (l, x)
 \end{code}
 
 
@@ -179,7 +180,8 @@ Start with Functor:
 \begin{code}
 instance Functor (State s) where
   fmap :: (a -> b) -> State s a -> State s b
-  fmap f st = undefined
+  fmap f st = State $ \s -> let (s', x) = runState st s 
+                            in (s', f x)
 \end{code}
 
 Then Applicative:
@@ -187,10 +189,13 @@ Then Applicative:
 \begin{code}
 instance Applicative (State s) where
   pure :: a -> State s a
-  pure = undefined
+  pure x = State $ \s -> (s, x)
   
   (<*>) :: State s (a -> b) -> State s a -> State s b
-  stf <*> stx = undefined
+  stf <*> stx = State $ \s -> let (s', f) = runState stf s  
+                                  (s'', x) = runState stx s'
+                              in (s'', f x) 
+                              -- in runState (fmap f stx) s'
 \end{code}
 
 And finally Monad:
@@ -198,7 +203,8 @@ And finally Monad:
 \begin{code}
 instance Monad (State s) where
   (>>=) :: State s a -> (a -> State s b) -> State s b
-  st >>= f = undefined
+  st >>= f = State $ \s -> let (s',  x) = runState st s
+                           in runState (f x) s'
 \end{code}
 
 
@@ -236,11 +242,11 @@ Let's write stateful functions that use get/put to model "variables":
 
 \begin{code}
 var :: String -> State [(String, a)] a
-var v = undefined
+var v = State $ \s -> (s, get v s)
 
 infixr 0 <==
 (<==) :: String -> a -> State [(String, a)] ()
-v <== x = undefined
+v <== x = State $ \s -> (put v x s, ())
 \end{code}
 
 

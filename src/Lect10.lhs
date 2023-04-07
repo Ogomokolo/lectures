@@ -281,7 +281,12 @@ represented by `State` monad values) is `sequence`:
 \begin{code}
 sequence :: Monad m => [m a] -> m [a]
 sequence [] = return []
-sequence (m:ms) = undefined
+-- sequence (m:ms) = m >>= \x -> 
+--                   sequence ms >>= \xs ->
+--                   return (x:xs)
+sequence (m:ms) = do x <- m 
+                     xs <- sequence ms
+                     return (x:xs)
 \end{code}
 
 
@@ -299,7 +304,8 @@ Sometimes we don't care about the result of a monadic action (e.g., for the
 \begin{code}
 sequence_ :: Monad m => [m a] -> m ()
 sequence_ [] = return ()
-sequence_ (m:ms) = undefined
+sequence_ (m:ms) = do m
+                      sequence_ ms
 \end{code}
 
 
@@ -315,10 +321,10 @@ sequencing it is so common that we implement `mapM` and `mapM_`
 
 \begin{code}
 mapM :: Monad m => (a -> m b) -> [a] -> m [b]
-mapM f = undefined
+mapM f = sequence . map f
 
 mapM_ :: Monad m => (a -> m b) -> [a] -> m ()
-mapM_ f = undefined
+mapM_ f = sequence_ . map f
 \end{code}
 
 Enabling:
@@ -333,10 +339,10 @@ Finally, by flipping the order of arguments of `mapM` and `mapM_`, we have the
 
 \begin{code}
 forM :: Monad m => [a] -> (a -> m b) -> m [b]
-forM = undefined
+forM = flip mapM
 
 forM_ :: Monad m => [a] -> (a -> m b) -> m ()
-forM_ = undefined
+forM_ = flip mapM_
 \end{code}
 
 This lets us write code like this:
@@ -383,7 +389,8 @@ Let's implement this directly:
 
 \begin{code}
 relabel :: Tree a -> [b] -> Tree b
-relabel = undefined
+relabel (Leaf x) (y:ys) = Leaf y 
+relabel (Node x l r) (y:ys) = Node y (relabel l ys) (relabel r ys)
 \end{code}
 
 
@@ -391,7 +398,12 @@ Let's try to write this using the State monad:
 
 \begin{code}
 relabel' :: Tree a -> State [b] (Tree b)
-relabel' = undefined
+relabel' (Leaf x) = do y <- pop 
+                       return $ Leaf y 
+relabel' (Node x l r) = do y <- pop 
+                           l' <- relabel' l
+                           r' <- relabel' r
+                           return $ Node y l' r'
 \end{code}
 
 
@@ -448,7 +460,15 @@ Let's write a function that implements a guessing game:
 
 \begin{code}
 guess :: Int -> IO ()
-guess n = undefined
+guess n = do putStrLn "Enter a guess:" 
+             x <- readLn 
+             case compare x n of 
+                LT -> do putStrLn "Too small!"
+                         guess n
+                GT -> do putStrLn "Too big!"
+                         guess n
+                otherwise -> do putStrLn "Good job!" 
+                                return ()
 \end{code}
 
 
@@ -468,7 +488,8 @@ caesar n (x:xs) = (if isLetter x then encrypt x else x) : caesar n xs
         n2l n = chr (n + ord 'A')
 
 caesarAction :: IO ()
-caesarAction = undefined
+caesarAction = do s <- getLine 
+                  putStrLn $ caesar 5 s
 \end{code}
 
 

@@ -179,3 +179,4 @@ parseEval :: String -> Either String Int
 parseEval s = case runState expr s of Nothing -> Left "No parse"
                                       Just ("", e) -> Right (eval e)
                                       Just (_, _) -> Left "Incomplete parse"
+

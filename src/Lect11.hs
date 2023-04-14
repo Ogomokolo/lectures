@@ -69,14 +69,6 @@ string (c:cs) = do char c
 --          "1 + 2 * 3 + 4" -> 11
 --          "(1 + 2) * (3 + 4))" -> 21 
 
-data Expr = Lit Int | Add Expr Expr | Mul Expr Expr
-            deriving Show
-
-
-eval :: Expr -> Int
-eval (Lit n) = n
-eval (Add e f) = eval e + eval f
-eval (Mul e f) = eval e * eval f
 
 
 digit :: Parser Char
@@ -133,9 +125,13 @@ symbol cs = token (string cs)
 
 -- Grammar (in Backus-Naur Form) for infix arithmetic expressions:
 --
---   expr   ::= term + expr | term
+--   expr   ::= term + expr   | term
 --   term   ::= factor * term | factor
---   factor ::= ( expr ) | integer 
+--   factor ::= ( expr )      | integer 
+
+data Expr = Lit Int | Add Expr Expr | Mul Expr Expr
+            deriving Show
+            
 
 expr :: Parser Expr
 --expr = do t <- term 
@@ -146,7 +142,7 @@ expr = do t <- term
           symbol "+"
           e <- expr
           return (Add t e)
-       <|> do term
+       <|> term
 
 
 term :: Parser Expr
@@ -158,7 +154,7 @@ term = do f <- factor
           symbol "*"
           t <- term
           return (Mul f t)
-       <|> do factor
+       <|> factor
 
 
 factor :: Parser Expr
@@ -167,5 +163,17 @@ factor = do symbol "("
             symbol ")"
             return e
           -- <|> do Lit <$> int
-          <|> do n <- int
-                 return (Lit n)
+          <|> do n <- token int
+                 return (Lit n) 
+
+
+eval :: Expr -> Int
+eval (Lit n) = n
+eval (Add e f) = eval e + eval f
+eval (Mul e f) = eval e * eval f
+
+
+parseEval :: String -> Either String Int 
+parseEval s = case runState expr s of Nothing -> Left "No parse"
+                                      Just ("", e) -> Right (eval e)
+                                      Just (_, _) -> Left "Incomplete parse"

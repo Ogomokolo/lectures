@@ -112,7 +112,9 @@ adjLocs (w, h) (x, y) =
 -- connects two adjacent locations in the maze by inserting them into
 -- each others' lists in the adjacency map
 openWall :: MazeLoc -> MazeLoc -> Maze -> Maze
-openWall l1 l2 mz@(Maze _ _ cmap) = undefined
+openWall l1 l2 mz@(Maze _ _ cmap) = 
+  -- l1 -> [l2] , l2 -> [l1] 
+  mz { mazeAdjMap = insertWith (++) l2 [l1] $ insertWith (++) l1 [l2] cmap}
 \end{code}
 
 
@@ -160,7 +162,10 @@ Let's write a function that generates three random integers in a range (using `r
 
 \begin{code}
 threeRandomInts :: RandomGen g => (Int,Int) -> g -> (Int, Int, Int)
-threeRandomInts range g = undefined
+threeRandomInts range g = let (v1, g')  = randomR range g
+                              (v2, g'') = randomR range g'
+                              (v3, _)   = randomR range g''
+                          in (v1, v2, v3)
 \end{code}
 
 How do we use `threeRandomInts` with `newStdGen`, and what is the result type?
@@ -184,14 +189,20 @@ Implement the function `getRandom` uses the `RandomGen` in the `State` monad to 
 
 \begin{code}
 getRandom :: (Int, Int) -> State StdGen Int
-getRandom range = undefined
+getRandom range = do g <- get 
+                     let (v, g') = randomR range g
+                     put g'
+                     return v
 \end{code}
 
 Now we can use `getRandom` to generate three random integers:
 
 \begin{code}
 threeRandomInts' :: (Int,Int) -> State StdGen (Int, Int, Int)
-threeRandomInts' range = undefined
+threeRandomInts' range = do v1 <- getRandom range 
+                            v2 <- getRandom range 
+                            v3 <- getRandom range 
+                            return (v1, v2, v3)
 \end{code}
 
 
@@ -207,7 +218,11 @@ Write a function that uses the `State` monad to shuffle a list:
 \begin{code}
 
 getShuffled :: [a] -> State StdGen [a]
-getShuffled l = undefined
+getShuffled l = do g <- get 
+                   let (g', g'') = split g
+                       l' = shuffle' l (length l) g'
+                   put g''
+                   return l'
 \end{code}
 
 ---
@@ -230,11 +245,24 @@ And now we're ready to implement a random maze generator!
 \begin{code}
 -- attempt 1: create a maze with a single "tunnel"
 genMazeSimple :: MazeDims -> State StdGen Maze
-genMazeSimple dims = undefined
+genMazeSimple dims = gen (emptyMaze dims) (1,1) 
+  where gen mz@(Maze _ _ cmap) currLoc = do 
+          newLocs <- getShuffled $ adjLocs dims currLoc 
+          let (newLoc:_) = newLocs
+          if newLoc `member` cmap 
+          then return mz 
+          else gen (openWall currLoc newLoc mz) newLoc
 
 -- maze generator using recursive backtracking
 genMaze :: MazeDims -> State StdGen Maze
-genMaze dims = undefined
+genMaze dims = gen (emptyMaze dims) (1,1) 
+  where gen mz currLoc = do 
+          newLocs <- getShuffled $ adjLocs dims currLoc 
+          foldM (\mz'@(Maze _ _ cmap) newLoc ->
+            if newLoc `member` cmap 
+            then return mz' 
+            else gen (openWall currLoc newLoc mz') newLoc)
+            mz newLocs
 
 -- convenience function for creating a random maze from the global RNG
 randomMaze :: MazeDims -> IO Maze

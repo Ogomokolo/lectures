@@ -22,6 +22,7 @@ import System.IO
 import System.Console.ANSI
 import Control.Concurrent
 import GHC.IO
+import Debug.Trace
 \end{code}
 
 
@@ -289,17 +290,17 @@ A search strategy should avoid re-visiting nodes, and address the following:
 
   - is a given node the goal node?
 
-    goal :: ?
+    goal :: a -> Bool
   
 
   - what node(s) are adjacent to / reachable from the given one?
 
-    adj :: ?
+    adj/succ :: a -> [a]
 
 
   - how do we combine newly discovered nodes with other unvisited ones?
 
-    comb :: ?
+    comb :: [a] -> [a] -> [a]
 
 
 
@@ -311,7 +312,26 @@ search :: (Eq a, Show a) =>
           -> ([a] -> [a] -> [a])
           -> [a] -> [a] 
           -> Maybe a
-search goal adj comb unvisited visited = undefined
+search goal adj comb unvisited visited
+  -- case unvisited of
+  --   [] -> Nothing
+  --   (x:xs) -> if goal x 
+  --             then Just x 
+  --             else search goal adj comb (nub (comb xs (adj x))) (x:visited)
+  | null unvisited = Nothing 
+  | goal (head unvisited) = Just $ head unvisited 
+  | otherwise = debug (head unvisited) $ search goal adj comb 
+    (nub (adj $ head unvisited) `comb` tail unvisited)
+    (head unvisited : visited) 
+
+searchNumTree :: Integer -> Maybe Integer 
+-- searchNumTree n = search goal adj comb [1] [] 
+--   where goal x = x == n 
+--         adj x = [2*x, 2*x+1] 
+--         comb = (++) 
+-- This implementation gives us the DFS so to fix it, we need to flip the comb args
+-- searchNumTree n = search (== n) (\m -> [2*m, 2*m+1]) (++) [1] []
+searchNumTree n = search (== n) (\m -> [2*m, 2*m+1]) (flip (++)) [1] []
 
 -- convenience function for tracing search execution
 debug :: Show a => a -> b -> b
@@ -331,10 +351,10 @@ debug x y = unsafePerformIO clearScreen `seq`
 
 \begin{code}
 dfs :: (Eq a, Show a) => (a -> Bool) -> (a -> [a]) -> a -> Maybe a
-dfs goal succ start = undefined
+dfs goal succ start = search goal succ (++) [start] []
 
 bfs :: (Eq a, Show a) => (a -> Bool) -> (a -> [a]) -> a -> Maybe a
-bfs goal succ start = undefined
+bfs goal succ start = search goal succ (flip (++)) [start] []
 \end{code}
 
 
@@ -342,7 +362,10 @@ Let's solve our maze using uninformed search:
 
 \begin{code}
 solveMaze :: Maze -> Maybe Maze
-solveMaze mz@(Maze (w,h) _ _) = undefined
+solveMaze mz@(Maze (w,h) _ _) = 
+  dfs (\(Maze _ path@((x,y):_) _) -> (x == w && y == h)) 
+      nextPaths  
+      (mz {mazePath = [(1,1)]})
 
 -- given a maze with a non-empty path, return a list of mazes, each of
 -- which extends the path by one location (based on the adjacency map)
@@ -381,7 +404,8 @@ bestFirstSearch :: (Eq a, Show a, Ord b) =>
                    -> (a -> [a])
                    -> (a -> b) 
                    -> a -> Maybe a
-bestFirstSearch goal succ cost start = undefined
+bestFirstSearch goal succ cost start = 
+  search goal succ (\xs ys -> sortOn cost (xs ++ ys)) [start] []
 \end{code}
 
 
@@ -405,7 +429,7 @@ maze thus far. Let's write it:
 
 \begin{code}
 bfsSolveMaze :: Maze -> Maybe Maze
-bfsSolveMaze = undefined
+bfsSolveMaze = solveMaze' (\(Maze _ path _) -> length path)
 \end{code}
 
 
@@ -418,7 +442,8 @@ estimate of the remaining distance to the exit as a cost function:
 
 \begin{code}
 bfsSolveMaze' :: Maze -> Maybe Maze
-bfsSolveMaze' mz@(Maze (w,h) _ _) = undefined
+bfsSolveMaze' mz@(Maze (w,h) _ _) = 
+  solveMaze' (\(Maze _ path@((x,y):_) _) -> (w-x)+(h-y)) mz
 \end{code}
 
 The strategy above is *greedy*. How would it perform on the following maze?

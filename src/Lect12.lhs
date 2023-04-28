@@ -13,7 +13,7 @@ import Data.List hiding (lines, insert)
 import Data.List.Split (chunksOf)
 import Data.Tree
 import Data.Word
-import Data.Map (Map, empty, fromList, (!), keys, elems, assocs,
+import Data.Map (Map, empty, fromList, keys, elems, assocs,
                  findWithDefault, member, insert, insertWith)
 import System.Random
 import System.Random.Shuffle
@@ -23,6 +23,7 @@ import System.Console.ANSI
 import Control.Concurrent
 import GHC.IO
 import Debug.Trace
+import Data.Array
 \end{code}
 
 
@@ -494,5 +495,84 @@ Let's implement an A* search solver for our maze:
 
 \begin{code}
 aStarSolveMaze :: Maze -> Maybe Maze
-aStarSolveMaze mz@(Maze (w,h) _ _) = undefined
+aStarSolveMaze mz@(Maze (w,h) _ _) = 
+  solveMaze' (\(Maze _ path@((x,y):_) _) -> (w-x)+(h-y) + length path) mz
+\end{code}
+
+\begin{code}
+type SPPiece = Char
+type SPIndex = (Int,Int)
+
+data SPuzzle = SP { 
+    dim :: Int,
+    pieces :: Array SPIndex SPPiece
+  } deriving (Eq)
+
+instance Show SPuzzle where
+  show (SP n ps) = ("\n" ++)
+                   $ intercalate "\n" 
+                   $ map (intersperse ' ') 
+                   $ chunksOf n 
+                   $ Data.Array.elems ps
+
+emptyPuzzle :: Int -> SPuzzle
+emptyPuzzle n = SP n $ listArray ((1,1),(n,n)) 
+                     $ (take (n^2-1) ['A'..]) ++ " " 
+
+-- need to do it this way because simply generating a random puzzle doesn't 
+-- mean it's solvable
+shufflePuzzle :: SPuzzle -> StdGen -> SPuzzle
+shufflePuzzle puz@(SP n ps) gen = foldl rand puz 
+                                        (take (n^3) $ randoms gen :: [Int])
+  where rand puz r = let alts = spuzMoves puz
+                     in alts !! (r `mod` (length alts))
+
+spuzLoc :: SPuzzle -> SPPiece -> (Int,Int)
+spuzLoc (SP n ps) p = let (Just i) = findIndex (==p) $ Data.Array.elems ps
+                      in ((i `div` n)+1, (i `mod` n)+1)
+
+
+spuzMoves :: SPuzzle -> [SPuzzle]
+spuzMoves puz@(SP n ps) = 
+  let (r,c) = spuzLoc puz ' '
+      adj = [(r+dr,c+dc) | dr <- [-1,0,1], dc <- [-1,0,1], 
+                           (dr==0 && dc/=0) || (dr/=0 && dc==0),
+                           inN (r+dr) && inN (c+dc)]
+      inN i = i >= 1 && i <= n
+  in [SP n (ps // [((r,c), ps!(r',c')), ((r',c'), ' ')]) | (r',c') <- adj] 
+
+spuzScore :: SPuzzle -> Int
+spuzScore puz@(SP n ps) = sum 
+                          $ zipWith dist (map (spuzLoc puz) 
+                                              (take (n^2-1) ['A'..]))
+                          $ [(r,c) | r <- [1..n], c <- [1..n]]
+  where dist (r1,c1) (r2,c2) = abs (r1-r2) + abs (c1-c2) 
+
+data SPSol = SPSol { solPath :: [SPuzzle] }
+
+instance Show SPSol where
+  show (SPSol ps) = show $ head ps
+
+instance Eq SPSol where
+  (SPSol (p1:_)) == (SPSol (p2:_)) = p1 == p2
+
+solvePuzzle :: SPuzzle -> SPSol
+solvePuzzle puz@(SP n ps) = 
+  let puzDone = emptyPuzzle n
+  in fromJust $ bestFirstSearch ((==puzDone) . head . solPath)
+                                nextSol
+                                cost
+                                (SPSol [puz])
+  where nextSol (SPSol ps@(p:_)) = [SPSol (np:ps) | np <- spuzMoves p, 
+                                                    not (np `elem` ps)]
+        cost (SPSol ps@(p:_)) = length ps + spuzScore p
+
+replaySol :: SPSol -> IO ()
+replaySol (SPSol ps) = 
+  forM_ (reverse ps) $ \p -> do 
+    clearScreen
+    setCursorPosition 0 0
+    print p
+    threadDelay $ 10^6
+
 \end{code}
